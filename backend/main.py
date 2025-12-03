@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from passlib.hash import bcrypt
-from db import SessionLocal, engine, Base, User
+from backend.database import SessionLocal, engine, Base, User
 
 # create DB tables if not present
 Base.metadata.create_all(bind=engine)
