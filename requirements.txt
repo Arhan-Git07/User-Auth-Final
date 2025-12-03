@@ -3,6 +3,3 @@ uvicorn
 sqlalchemy
 pydantic
 passlib
-python-jose[cryptography]
-pytest
-pytest-asyncio
