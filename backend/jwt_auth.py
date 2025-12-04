@@ -1,5 +1,5 @@
 """
-JWT Token Generation & Profile Management
+JWT Token Generation & Profile Managementgo
 Simple implementation for JWT authentication and user profile operations
 """
 from datetime import datetime, timedelta
