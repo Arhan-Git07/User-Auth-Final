@@ -8,7 +8,7 @@ from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from database import SessionLocal, User
+from backend.database import SessionLocal, User
 from passlib.hash import bcrypt
 
 # JWT Configuration
@@ -97,6 +97,7 @@ def update_user_profile(user_id: int, name: Optional[str] = None, email: Optiona
     return {
         "id": user.id,
         "name": user.name,
-        "email": user.email
+        "email": user.email,
+        "role": user.role  # 🆕 NEW: Include role
     }
 
