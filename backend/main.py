@@ -2,13 +2,18 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
-from passlib.hash import bcrypt
-from backend.database import SessionLocal, engine, Base, User
+from passlib.context import CryptContext
+from database import SessionLocal, engine, Base, User
+from jwt_auth import create_access_token, authenticate_user, get_current_user
+from rbac import Role, get_user_role, require_role, require_permission, check_permission
 
 # create DB tables if not present
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="OJT Simple Auth & CRUD API", version="1.0")
+# Password hashing context
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+app = FastAPI(title="User Auth & Profiles", version="1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,19 +35,23 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
 
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
 class UserOut(BaseModel):
     id: int
     name: str
     email: EmailStr
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 @app.post("/register", response_model=dict, tags=["Auth"])
 def register(payload: UserCreate, db: Session = Depends(get_db)):
     # simple unique email check
     if db.query(User).filter(User.email == payload.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
-    hashed = bcrypt.hash(payload.password)
+    hashed = pwd_context.hash(payload.password)
     user = User(name=payload.name, email=payload.email, password=hashed)
     db.add(user)
     db.commit()
@@ -50,41 +59,81 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
     return {"message": "Registered", "user_id": user.id}
 
 @app.post("/login", response_model=dict, tags=["Auth"])
-def login(payload: UserCreate, db: Session = Depends(get_db)):
-    # Note: Login here uses email + password; in a real app use tokens.
-    user = db.query(User).filter(User.email == payload.email).first()
-    if not user or not bcrypt.verify(payload.password, user.password):
+def login(payload: LoginRequest, db: Session = Depends(get_db)):
+    """Login endpoint that returns JWT token"""
+    user = authenticate_user(payload.email, payload.password, db)
+    if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    return {"message": "Login successful", "user_id": user.id}
+    
+    # Create JWT token
+    access_token = create_access_token(data={"sub": user.email})
+    user_role = get_user_role(user)
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user_id": user.id,
+        "email": user.email,
+        "role": user_role.value,
+        "message": "Login successful"
+    }
 
 @app.get("/users", response_model=list[UserOut], tags=["Users"])
-def list_users(db: Session = Depends(get_db)):
+def list_users(current_user: User = Depends(require_permission("read")), db: Session = Depends(get_db)):
+    """Get all users - requires authentication and read permission"""
     return db.query(User).all()
 
 @app.get("/users/{user_id}", response_model=UserOut, tags=["Users"])
-def get_user(user_id: int, db: Session = Depends(get_db)):
+def get_user(user_id: int, current_user: User = Depends(require_permission("read")), db: Session = Depends(get_db)):
+    """Get user by ID - requires authentication and read permission"""
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
 @app.put("/users/{user_id}", response_model=dict, tags=["Users"])
-def update_user(user_id: int, payload: UserCreate, db: Session = Depends(get_db)):
+def update_user(user_id: int, payload: UserCreate, current_user: User = Depends(require_permission("write")), db: Session = Depends(get_db)):
+    """Update user - requires write permission (admin or moderator only)"""
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     user.name = payload.name
     user.email = payload.email
-    user.password = bcrypt.hash(payload.password)
+    user.password = pwd_context.hash(payload.password)
     db.add(user)
     db.commit()
     return {"message": "Updated"}
 
 @app.delete("/users/{user_id}", response_model=dict, tags=["Users"])
-def delete_user(user_id: int, db: Session = Depends(get_db)):
+def delete_user(user_id: int, current_user: User = Depends(require_permission("delete")), db: Session = Depends(get_db)):
+    """Delete user - requires delete permission (admin only)"""
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     db.delete(user)
     db.commit()
     return {"message": "Deleted"}
+
+# RBAC Demo Endpoints (requires JWT authentication)
+
+@app.get("/admin-only", tags=["RBAC Demo"])
+def admin_only_endpoint(current_user: User = Depends(require_role([Role.ADMIN]))):
+    """Only accessible by admin users (email contains 'admin')"""
+    return {"message": "Admin access granted", "user": current_user.email}
+
+@app.get("/moderator-or-admin", tags=["RBAC Demo"])
+def moderator_endpoint(current_user: User = Depends(require_role([Role.ADMIN, Role.MODERATOR]))):
+    """Accessible by admin or moderator users"""
+    return {"message": "Moderator/Admin access granted", "user": current_user.email}
+
+@app.get("/check-permission/{permission}", tags=["RBAC Demo"])
+def check_user_permission(permission: str, current_user: User = Depends(require_permission("read"))):
+    """Check if user has a specific permission"""
+    has_permission = check_permission(current_user, permission)
+    user_role = get_user_role(current_user)
+    return {
+        "user": current_user.email,
+        "role": user_role.value,
+        "permission": permission,
+        "has_permission": has_permission
+    }

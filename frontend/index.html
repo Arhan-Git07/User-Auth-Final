@@ -1,33 +1,79 @@
-
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>User Authentication</title>
+  <title>User Auth & Profiles</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="container">
-    <h1>User Registration</h1>
-    <div class="row">
-      <div class="card">
-        <h3>Create / Register</h3>
-        <input id="name" placeholder="Full name" />
-        <input id="email" placeholder="Email" />
-        <input id="password" placeholder="Password" type="password" />
-        <button onclick="register()">Register</button>
-      </div>
+    <h1>User Auth & Profiles</h1>
+    
+    <!-- 🆕 NEW: Login Section -->
+    <div id="loginSection">
+      <div class="row">
+        <div class="card">
+          <h3>🔐 Login</h3>
+          <input id="loginEmail" placeholder="Email" type="email" />
+          <input id="loginPassword" placeholder="Password" type="password" />
+          <button onclick="login()">Login</button>
+        </div>
 
-      <div class="card">
-        <h3>Actions</h3>
-        <button onclick="loadUsers()">Load Users</button>
-        <div id="msg" class="msg"></div>
+        <div class="card">
+          <h3>📝 Register New User</h3>
+          <input id="name" placeholder="Full name" />
+          <input id="email" placeholder="Email (e.g., admin@example.com)" type="email" />
+          <input id="password" placeholder="Password" type="password" />
+          <small style="color: #666; display: block; margin-top: 8px;">
+            💡 Tip: Use "admin@" in email for admin role, "mod@" for moderator role
+          </small>
+          <button onclick="register()">Register</button>
+        </div>
       </div>
     </div>
 
-    <div id="users" class="grid"></div>
+    <!-- 🆕 NEW: Main Section (shown after login) -->
+    <div id="mainSection" style="display: none;">
+      <div class="card" style="background: #f0f9ff; border: 2px solid #3b82f6;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span style="font-weight: bold;">✓ Logged In</span>
+            <span id="userRole" style="margin-left: 12px; color: #3b82f6;"></span>
+          </div>
+          <button onclick="logout()" style="background: #ef4444;">Logout</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="card">
+          <h3>👥 User Profiles</h3>
+          <button onclick="loadUsers()">Refresh Users</button>
+          <div id="msg" class="msg"></div>
+        </div>
+      </div>
+
+      <h3>All Users</h3>
+      <div id="users" class="grid"></div>
+    </div>
+
+    <!-- Info Section -->
+    <div class="card" style="margin-top: 24px; background: #fef3c7; border-left: 4px solid #f59e0b;">
+      <h4 style="margin-top: 0;">ℹ️ Role Permissions & How Roles Work</h4>
+      <ul style="margin: 0; padding-left: 20px;">
+        <li><b>Admin:</b> Email contains "admin" → Can read, write, delete, and manage roles</li>
+        <li><b>Moderator:</b> Email contains "mod" or "moderator" → Can read and write (edit users)</li>
+        <li><b>User:</b> Default → Can only read (view users)</li>
+      </ul>
+      <p style="margin: 12px 0 0 0; color: #92400e;">
+        <b>Examples:</b> admin@test.com (admin), moderator@test.com (moderator), user@test.com (user)
+      </p>
+    </div>
   </div>
 
   <script src="app.js"></script>
+  <script>
+    // Check authentication on page load
+    checkAuth();
+  </script>
 </body>
 </html>
