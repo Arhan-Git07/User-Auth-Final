@@ -1,22 +1,26 @@
 """
-JWT Token Generation & Profile Managementgo
+JWT Token Generation & Profile Management
 Simple implementation for JWT authentication and user profile operations
 """
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from backend.database import SessionLocal, User
-from passlib.hash import bcrypt
+from database import SessionLocal, User
+from passlib.context import CryptContext
 
 # JWT Configuration
 SECRET_KEY = "your-secret-key-change-in-production"  # Change in production!
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+# Password hashing context
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# HTTPBearer for simple Bearer token authentication in Swagger
+security = HTTPBearer()
 
 def get_db():
     """Database dependency"""
@@ -37,7 +41,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def verify_token(token: str = Depends(oauth2_scheme)):
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Verify JWT token and return user email"""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -45,6 +49,7 @@ def verify_token(token: str = Depends(oauth2_scheme)):
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
+        token = credentials.credentials
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
         if email is None:
@@ -68,7 +73,7 @@ def authenticate_user(email: str, password: str, db: Session):
     user = db.query(User).filter(User.email == email).first()
     if not user:
         return False
-    if not bcrypt.verify(password, user.password):
+    if not pwd_context.verify(password, user.password):
         return False
     return user
 
@@ -97,7 +102,6 @@ def update_user_profile(user_id: int, name: Optional[str] = None, email: Optiona
     return {
         "id": user.id,
         "name": user.name,
-        "email": user.email,
-        "role": user.role  # 🆕 NEW: Include role
+        "email": user.email
     }
 
