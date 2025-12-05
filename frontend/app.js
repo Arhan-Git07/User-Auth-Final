@@ -1,4 +1,5 @@
-const API = "http://localhost:8000";
+// API URL - Update config.js for deployment!
+const API = API_URL || "http://localhost:8000";
 
 // 🆕 Store authentication token
 let authToken = null;
