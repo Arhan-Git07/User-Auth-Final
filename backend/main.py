@@ -114,7 +114,7 @@ def delete_user(user_id: int, current_user: User = Depends(require_permission("d
     db.commit()
     return {"message": "Deleted"}
 
-# RBAC Demo Endpoints (requires JWT authentication for their spe)
+# RBAC Demo Endpoints (requires JWT authentication)
 
 @app.get("/admin-only", tags=["RBAC Demo"])
 def admin_only_endpoint(current_user: User = Depends(require_role([Role.ADMIN]))):
